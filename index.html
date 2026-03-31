@@ -1,0 +1,252 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCANIT-TRS GEOTAGING</title>
+
+<style>
+body{
+    font-family:Segoe UI;
+    background:url('picture.png');
+    background-size:cover;
+    background-position:center;
+    background-attachment:fixed;
+    margin:0;
+}
+.header{
+    background:#22c55e;
+    color:white;
+    padding:15px;
+    text-align:center;
+    font-weight:bold;
+}
+.container{
+    padding:10px;
+}
+.card{
+    background:rgba(255,255,255,0.95);
+    margin-bottom:10px;
+    padding:15px;
+    border-radius:12px;
+}
+select, textarea, input{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+}
+button{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#22c55e;
+    color:white;
+    font-size:16px;
+}
+.status{
+    text-align:center;
+    margin-top:10px;
+    font-size:13px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="header">SCANIT-TRS GEOTAGING</div>
+
+<div class="container">
+
+<div class="card">
+<label>Salesman</label>
+<select id="salesman"></select>
+</div>
+
+<div class="card">
+<label>Cabang</label>
+<select id="cabang"></select>
+</div>
+
+<div class="card">
+<label>Search Customer</label>
+<input type="text" id="searchCustomer" placeholder="Ketik kode outlet...">
+</div>
+
+<div class="card">
+<label>Customer</label>
+<select id="customer"></select>
+</div>
+
+<div class="card">
+<label>Alamat (Auto GPS)</label>
+<textarea id="alamat"></textarea>
+</div>
+
+<div class="card">
+<label>Foto Lokasi</label>
+<input type="file" id="foto" accept="image/*">
+</div>
+
+<div class="card">
+<button onclick="kirim()">✅ SEND VALIDATION</button>
+<div class="status" id="status">Menunggu GPS...</div>
+</div>
+
+</div>
+
+<script>
+
+const API_URL = "https://script.google.com/macros/s/AKfycbysdfoUl5SWy2h8fuI-0zsWNzDuPgZ2YIAMmgBCW0XF3Ol8u3nbMz6SrdnsiSR3m73pGw/exec";
+
+let lat, lng;
+let masterData = [];
+
+// ======================
+// LOAD DATA
+// ======================
+async function loadMaster(){
+    let res = await fetch(API_URL);
+    masterData = await res.json();
+
+    let salesList = [...new Set(masterData.map(x=>x.salesman))];
+
+    let sales = document.getElementById("salesman");
+    sales.innerHTML = "";
+
+    salesList.forEach(s=>{
+        sales.innerHTML += `<option>${s}</option>`;
+    });
+
+    filterData();
+}
+
+function filterData(){
+
+    document.getElementById("searchCustomer").value = "";
+
+    let selectedSales = document.getElementById("salesman").value;
+
+    let cabang = document.getElementById("cabang");
+    let customer = document.getElementById("customer");
+
+    cabang.innerHTML = "";
+    customer.innerHTML = "";
+
+    let filtered = masterData.filter(x=>x.salesman == selectedSales);
+
+    let cabangList = [...new Set(filtered.map(x=>x.cabang))];
+
+    cabangList.forEach(c=>{
+        cabang.innerHTML += `<option>${c}</option>`;
+    });
+
+    filtered.forEach(item=>{
+        customer.innerHTML += `<option>${item.customer}</option>`;
+    });
+}
+
+// 🔥 SEARCH
+document.getElementById("searchCustomer").addEventListener("input", function(){
+
+    let keyword = this.value.toLowerCase();
+    let selectedSales = document.getElementById("salesman").value;
+
+    let customer = document.getElementById("customer");
+    customer.innerHTML = "";
+
+    let filtered = masterData.filter(x =>
+        x.salesman == selectedSales &&
+        x.customer.toLowerCase().includes(keyword)
+    );
+
+    filtered.forEach(item=>{
+        customer.innerHTML += `<option>${item.customer}</option>`;
+    });
+
+});
+
+document.addEventListener("change", function(e){
+    if(e.target.id === "salesman"){
+        filterData();
+    }
+});
+
+loadMaster();
+
+
+// ======================
+// GPS
+// ======================
+navigator.geolocation.getCurrentPosition(async pos=>{
+    lat = pos.coords.latitude;
+    lng = pos.coords.longitude;
+
+    document.getElementById("status").innerText = "📍 GPS siap";
+
+    try{
+        let res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        let data = await res.json();
+
+        if(data.display_name){
+            document.getElementById("alamat").value = data.display_name;
+        }
+    }catch(e){}
+});
+
+
+// ======================
+// KIRIM
+// ======================
+function kirim(){
+
+    if(!lat){
+        alert("GPS belum siap");
+        return;
+    }
+
+    let file = document.getElementById("foto").files[0];
+
+    if(!file){
+        alert("Foto wajib");
+        return;
+    }
+
+    let reader = new FileReader();
+
+    reader.onload = async function(){
+
+        let formData = new FormData();
+        formData.append("data", JSON.stringify({
+            salesman: document.getElementById("salesman").value,
+            cabang: document.getElementById("cabang").value,
+            customer: document.getElementById("customer").value,
+            lat: lat,
+            lng: lng,
+            alamat: document.getElementById("alamat").value,
+            foto: reader.result
+        }));
+
+        let res = await fetch(API_URL, {
+            method:"POST",
+            body: formData
+        });
+
+        let text = await res.text();
+
+        if(text.includes("OK")){
+            alert("✅ BERHASIL");
+            location.reload();
+        }else{
+            alert(text);
+        }
+    };
+
+    reader.readAsDataURL(file);
+}
+
+</script>
+
+</body>
+</html>
