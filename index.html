@@ -24,7 +24,6 @@ body{
 .title{
   text-align:center;
   color:white;
-  font-weight:bold;
 }
 
 .card{
@@ -46,18 +45,16 @@ select,input,textarea{
   overflow:auto;
   border:1px solid #ccc;
   border-radius:8px;
-  margin-top:5px;
   display:none;
 }
 
 .item{
   padding:8px;
-  border-bottom:1px solid #eee;
   cursor:pointer;
 }
 
 .item:hover{
-  background:#f1f1f1;
+  background:#eee;
 }
 
 button{
@@ -67,7 +64,6 @@ button{
   border-radius:10px;
   background:#e74c3c;
   color:white;
-  font-size:16px;
 }
 
 #map{
@@ -79,7 +75,6 @@ button{
   background:white;
   padding:10px;
   border-radius:10px;
-  margin-top:10px;
   text-align:center;
 }
 </style>
@@ -90,7 +85,7 @@ button{
 <div class="container">
 
 <h2 class="title">SCANIT-TRS</h2>
-<div class="title" id="progress">0/0 selesai</div>
+<div class="title" id="progress">Loading...</div>
 
 <div class="card">
 <select id="sales"></select>
@@ -132,37 +127,43 @@ button{
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
-<!-- LEAFLET -->
+<!-- MAP -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-// 🔥 CONFIG
+// ================== FIREBASE ==================
 firebase.initializeApp({
-  apiKey:"AIzaSy",
-  authDomain:"geotagging-system.firebaseapp.com",
-  databaseURL:"https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+  apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
+  authDomain: "geotagging-system.firebaseapp.com",
+  databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
 });
 
 const db = firebase.database();
 
-// =========================
-// GLOBAL
-// =========================
+// ================== GLOBAL ==================
 let outlets = {};
 let listData = [];
-let lat=0, lng=0;
-let selectedKode=null;
+let selectedKode = null;
+let lat = 0, lng = 0;
 
-// =========================
-// LOAD DATA
-// =========================
-db.ref("outlets").once("value",(snap)=>{
+// ================== LOAD DATA ==================
+console.log("LOAD FIREBASE...");
+
+db.ref("outlets").once("value")
+.then(snap=>{
   const data = snap.val();
+
+  console.log("DATA:", data);
+
+  if(!data){
+    alert("❌ Data kosong di Firebase");
+    return;
+  }
 
   for(let k in data){
     const o = data[k];
 
-    outlets[k]={
+    outlets[k] = {
       kode: o.Kode || o.kode || "",
       nama: o.Nama || o.nama || "",
       cabang: o.Cabang || o.cabang || "",
@@ -171,54 +172,57 @@ db.ref("outlets").once("value",(snap)=>{
   }
 
   initDropdown();
+})
+.catch(err=>{
+  alert("❌ Firebase error: "+err.message);
 });
 
-// =========================
-// DROPDOWN
-// =========================
+// ================== DROPDOWN ==================
 function initDropdown(){
-  const sales = document.getElementById("sales");
-  const cabang = document.getElementById("cabang");
+  const salesEl = document.getElementById("sales");
+  const cabangEl = document.getElementById("cabang");
 
-  let sSet=new Set(), cSet=new Set();
+  let sSet = new Set();
+  let cSet = new Set();
 
   Object.values(outlets).forEach(o=>{
     if(o.sales) sSet.add(o.sales);
     if(o.cabang) cSet.add(o.cabang);
   });
 
-  sales.innerHTML="<option>Pilih Sales</option>";
-  cabang.innerHTML="<option>Pilih Cabang</option>";
+  salesEl.innerHTML = `<option>Pilih Sales</option>`;
+  cabangEl.innerHTML = `<option>Pilih Cabang</option>`;
 
   sSet.forEach(s=>{
-    sales.innerHTML += `<option>${s}</option>`;
+    salesEl.innerHTML += `<option>${s}</option>`;
   });
 
   cSet.forEach(c=>{
-    cabang.innerHTML += `<option>${c}</option>`;
+    cabangEl.innerHTML += `<option>${c}</option>`;
   });
 }
 
-// =========================
-// FILTER
-// =========================
-document.getElementById("sales").onchange = filter;
-document.getElementById("cabang").onchange = filter;
+// ================== FILTER ==================
+sales.onchange = filter;
+cabang.onchange = filter;
 
 function filter(){
   const s = sales.value;
   const c = cabang.value;
 
+  if(s==="Pilih Sales" || c==="Pilih Cabang"){
+    listData = [];
+    return;
+  }
+
   listData = Object.values(outlets).filter(o=>{
-    return o.sales==s && o.cabang==c;
+    return o.sales === s && o.cabang === c;
   });
 
   updateProgress();
 }
 
-// =========================
-// SEARCH
-// =========================
+// ================== SEARCH ==================
 search.oninput = function(){
   const q = this.value.toLowerCase();
 
@@ -227,37 +231,34 @@ search.oninput = function(){
     return;
   }
 
-  list.style.display="block";
-
   const result = listData.filter(o=>
     (o.nama || "").toLowerCase().includes(q) ||
     (o.kode || "").toLowerCase().includes(q)
   );
 
-  list.innerHTML = result.map(o=>
-    `<div class="item" onclick="pilih('${o.kode}')">
+  list.style.display="block";
+  list.innerHTML = result.map(o=>`
+    <div class="item" onclick="pilih('${o.kode}')">
       ${o.kode} - ${o.nama}
-    </div>`
-  ).join("");
+    </div>
+  `).join("");
 };
 
-// =========================
-// PILIH
-// =========================
+// ================== PILIH ==================
 function pilih(kode){
-  const o = listData.find(x=>x.kode==kode);
+  const o = listData.find(x=>x.kode === kode);
 
   selectedKode = kode;
 
-  document.getElementById("kode").value = o.kode;
-  document.getElementById("nama").value = o.nama;
+  kodeEl.value = o.kode;
+  nama.value = o.nama;
 
   list.style.display="none";
 }
 
-// =========================
-// GPS + MAP
-// =========================
+const kodeEl = document.getElementById("kode");
+
+// ================== GPS ==================
 navigator.geolocation.getCurrentPosition(pos=>{
   lat = pos.coords.latitude;
   lng = pos.coords.longitude;
@@ -267,56 +268,53 @@ navigator.geolocation.getCurrentPosition(pos=>{
   initMap();
   getAlamat();
 
-}, err=>{
+},()=>{
   gps.innerText="❌ GPS gagal";
 });
 
+// ================== MAP ==================
 function initMap(){
-  const map = L.map('map').setView([lat,lng], 15);
+  const map = L.map('map').setView([lat,lng],15);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+  .addTo(map);
 
   L.marker([lat,lng]).addTo(map);
 }
 
-// =========================
-// AUTO ALAMAT
-// =========================
+// ================== ALAMAT ==================
 function getAlamat(){
   fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
-  .then(res=>res.json())
+  .then(r=>r.json())
   .then(d=>{
     alamat.value = d.display_name;
   });
 }
 
-// =========================
-// PROGRESS
-// =========================
+// ================== PROGRESS ==================
 function updateProgress(){
-  let total = listData.length;
   let done = JSON.parse(localStorage.getItem("done")||"[]");
-
-  progress.innerText = `${done.length}/${total} selesai`;
+  progress.innerText = `${done.length}/${listData.length} selesai`;
 }
 
-// =========================
-// KIRIM
-// =========================
+// ================== KIRIM ==================
 function kirim(){
 
   if(!selectedKode){
-    alert("Pilih outlet dulu!");
+    alert("❌ pilih outlet dulu");
     return;
   }
 
   const file = foto.files[0];
 
+  if(!file){
+    alert("❌ foto wajib");
+    return;
+  }
+
   const reader = new FileReader();
 
   reader.onload = function(){
-
-    const base64 = reader.result;
 
     const data = {
       kode:selectedKode,
@@ -325,7 +323,7 @@ function kirim(){
       cabang:cabang.value,
       alamat:alamat.value,
       lat,lng,
-      foto:base64,
+      foto:reader.result,
       waktu:new Date().toISOString()
     };
 
@@ -335,16 +333,12 @@ function kirim(){
     done.push(selectedKode);
     localStorage.setItem("done", JSON.stringify(done));
 
-    alert("✅ Tersimpan");
+    alert("✅ berhasil");
 
     location.reload();
   };
 
-  if(file){
-    reader.readAsDataURL(file);
-  }else{
-    alert("Foto wajib!");
-  }
+  reader.readAsDataURL(file);
 }
 </script>
 
