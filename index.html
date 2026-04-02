@@ -5,19 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SCANIT-TRS</title>
 
-<!-- MAP -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
 body{
+  margin:0;
   font-family:Arial;
   background:linear-gradient(135deg,#2ecc71,#27ae60);
-  margin:0;
+  color:#333;
 }
 
 .container{
-  max-width:400px;
+  max-width:420px;
   margin:auto;
   padding:15px;
 }
@@ -25,14 +24,14 @@ body{
 .title{
   text-align:center;
   color:white;
-  font-size:20px;
-  font-weight:bold;
+  font-size:22px;
+  margin-bottom:10px;
 }
 
 .progress{
   text-align:center;
   color:white;
-  margin-bottom:10px;
+  margin-bottom:15px;
 }
 
 .card{
@@ -42,21 +41,20 @@ body{
   border-radius:12px;
 }
 
-select,input,textarea{
+input, select, textarea{
   width:100%;
   padding:10px;
   border-radius:8px;
   border:1px solid #ccc;
-  margin-top:5px;
 }
 
-#list{
-  max-height:180px;
+#listOutlet{
+  max-height:200px;
   overflow-y:auto;
   background:white;
   border-radius:10px;
-  display:none;
   margin-top:5px;
+  display:none;
 }
 
 .item{
@@ -64,38 +62,28 @@ select,input,textarea{
   border-bottom:1px solid #eee;
   cursor:pointer;
 }
-
 .item:hover{
   background:#f1f1f1;
+}
+
+button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:10px;
+  background:#e74c3c;
+  color:white;
+  font-size:16px;
 }
 
 #map{
   height:200px;
   border-radius:10px;
 }
-
-button{
-  width:100%;
-  padding:15px;
-  border:none;
-  border-radius:10px;
-  background:#e74c3c;
-  color:white;
-}
 </style>
 </head>
 
 <body>
-
-<!-- SPLASH -->
-<div id="splash" style="
-position:fixed;
-top:0;left:0;width:100%;height:100%;
-background:#27ae60;color:white;
-display:flex;align-items:center;justify-content:center;
-font-size:22px;z-index:9999;">
-SCANIT-TRS
-</div>
 
 <div class="container">
 
@@ -103,16 +91,16 @@ SCANIT-TRS
 <div class="progress" id="progress">0/0 selesai</div>
 
 <div class="card">
-<select id="salesman"><option>Loading...</option></select>
+<select id="sales"></select>
 </div>
 
 <div class="card">
-<select id="cabang"><option>Loading...</option></select>
+<select id="cabang"></select>
 </div>
 
 <div class="card">
 <input id="search" placeholder="Cari outlet...">
-<div id="list"></div>
+<div id="listOutlet"></div>
 </div>
 
 <div class="card">
@@ -121,7 +109,7 @@ SCANIT-TRS
 </div>
 
 <div class="card">
-<textarea id="alamat"></textarea>
+<textarea id="alamat" placeholder="Alamat"></textarea>
 </div>
 
 <div class="card">
@@ -132,171 +120,152 @@ SCANIT-TRS
 <input type="file" id="foto">
 </div>
 
-<div class="card" id="gpsInfo">📍 GPS loading...</div>
+<div class="card" id="gpsStatus">📍 GPS loading...</div>
 
 <button onclick="kirim()">🚀 KIRIM DATA</button>
 
 </div>
 
-<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-console.log("APP START");
-
-// 🔥 CONFIG LU (SUDAH BENER DARI SEBELUMNYA)
+// 🔥 FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
   authDomain: "geotagging-system.firebaseapp.com",
   databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "geotagging-system",
-  storageBucket: "geotagging-system.appspot.com",
-  messagingSenderId: "954782185667",
-  appId: "1:954782185667:web:96ee2d0726a2708f39ca76"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let allData = {};
-let submitted = {};
-let lat=null, lng=null;
-let map, marker;
+// 🔥 GLOBAL
+let outlets = {};
+let filtered = [];
+let selected = null;
 
-// 🔥 LOAD DATA OUTLET
+// 🔥 LOAD DATA
 db.ref("outlets").once("value", snap=>{
-  allData = snap.val() || {};
+  const data = snap.val();
 
-  console.log("DATA:", allData);
-
-  let sSet=new Set();
-  let cSet=new Set();
-
-  Object.values(allData).forEach(d=>{
-    sSet.add(d.Salesman);
-    cSet.add(d.Cabang);
+  Object.keys(data).forEach(k=>{
+    const o = data[k];
+    outlets[k] = {
+      kode:o.Kode,
+      nama:o.Nama,
+      cabang:o.Cabang,
+      sales:o.Salesman
+    };
   });
 
-  salesman.innerHTML="<option>Pilih Sales</option>";
-  cabang.innerHTML="<option>Pilih Cabang</option>";
-
-  sSet.forEach(s=>salesman.innerHTML+=`<option>${s}</option>`);
-  cSet.forEach(c=>cabang.innerHTML+=`<option>${c}</option>`);
+  initDropdown();
 });
 
-// 🔥 DATA SUDAH DIISI
-db.ref("kunjungan").on("value", snap=>{
-  submitted={};
-  snap.forEach(d=>{
-    submitted[d.val().kode]=true;
+// 🔥 INIT DROPDOWN
+function initDropdown(){
+  const salesSet = new Set();
+  const cabangSet = new Set();
+
+  Object.values(outlets).forEach(o=>{
+    salesSet.add(o.sales);
+    cabangSet.add(o.cabang);
   });
-});
 
-// 🔥 GPS
-navigator.geolocation.watchPosition(pos=>{
-  lat=pos.coords.latitude;
-  lng=pos.coords.longitude;
+  const sales = document.getElementById("sales");
+  const cabang = document.getElementById("cabang");
 
-  gpsInfo.innerText="📍 GPS AKTIF";
+  sales.innerHTML = `<option>Pilih Sales</option>`;
+  cabang.innerHTML = `<option>Pilih Cabang</option>`;
 
-  if(!map){
-    map=L.map('map').setView([lat,lng],16);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    marker=L.marker([lat,lng]).addTo(map);
-  }else{
-    marker.setLatLng([lat,lng]);
-  }
-}, err=>{
-  gpsInfo.innerText="❌ GPS ERROR";
-});
+  salesSet.forEach(s=> sales.innerHTML += `<option>${s}</option>`);
+  cabangSet.forEach(c=> cabang.innerHTML += `<option>${c}</option>`);
+
+  sales.onchange = filterData;
+  cabang.onchange = filterData;
+}
+
+// 🔥 FILTER
+function filterData(){
+  const s = sales.value;
+  const c = cabang.value;
+
+  filtered = Object.values(outlets).filter(o=>{
+    return (!s || o.sales===s) && (!c || o.cabang===c);
+  });
+
+  renderList(filtered);
+}
 
 // 🔥 SEARCH
-search.addEventListener("input", render);
-salesman.addEventListener("change", render);
-cabang.addEventListener("change", render);
+search.oninput = ()=>{
+  const q = search.value.toLowerCase();
 
-function render(){
+  const result = filtered.filter(o =>
+    o.nama.toLowerCase().includes(q) ||
+    o.kode.toLowerCase().includes(q)
+  );
 
-  if(!salesman.value || !cabang.value) return;
+  renderList(result);
+};
 
-  let s=salesman.value;
-  let c=cabang.value;
-  let key=search.value.toLowerCase();
-
-  list.innerHTML="";
+// 🔥 RENDER LIST
+function renderList(arr){
+  const list = document.getElementById("listOutlet");
   list.style.display="block";
 
-  let total=0,done=0;
-
-  Object.keys(allData).forEach(k=>{
-    let d=allData[k];
-    let nama=d.Nama.toLowerCase();
-
-    if(d.Salesman==s && d.Cabang==c){
-      total++;
-
-      if(submitted[k]){done++; return;}
-
-      if(!key || nama.includes(key)){
-        list.innerHTML+=`
-        <div class="item" onclick="pilih('${k}')">
-          ${d.Nama}
-        </div>`;
-      }
-    }
-  });
-
-  progress.innerText=`${done}/${total} selesai`;
+  list.innerHTML = arr.map(o=>`
+    <div class="item" onclick="pilih('${o.kode}')">
+      ${o.kode} - ${o.nama}
+    </div>
+  `).join("");
 }
 
-function pilih(id){
-  let d=allData[id];
-  kode.value=id;
-  nama.value=d.Nama;
-  list.style.display="none";
+// 🔥 PILIH
+function pilih(kode){
+  const o = Object.values(outlets).find(x=>x.kode===kode);
+  selected = o;
+
+  kodeInput.value = o.kode;
+  nama.value = o.nama;
+
+  listOutlet.style.display="none";
 }
+
+// 🔥 GPS + MAP
+let lat,lng;
+const map = L.map('map').setView([-7.7,110.5], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+navigator.geolocation.getCurrentPosition(pos=>{
+  lat = pos.coords.latitude;
+  lng = pos.coords.longitude;
+
+  document.getElementById("gpsStatus").innerText="📍 GPS AKTIF";
+
+  map.setView([lat,lng],16);
+  L.marker([lat,lng]).addTo(map);
+
+}, err=>{
+  document.getElementById("gpsStatus").innerText="❌ GPS gagal";
+});
 
 // 🔥 KIRIM
 function kirim(){
+  if(!selected) return alert("Pilih outlet dulu");
 
-  if(!kode.value){
-    alert("Pilih outlet dulu!");
-    return;
-  }
+  db.ref("checkin").push({
+    ...selected,
+    lat,
+    lng,
+    waktu:new Date().toISOString()
+  });
 
-  let file=foto.files[0];
-  let reader=new FileReader();
-
-  reader.onload=function(){
-    let data={
-      salesman:salesman.value,
-      cabang:cabang.value,
-      kode:kode.value,
-      nama:nama.value,
-      alamat:alamat.value,
-      lat,lng,
-      foto:reader.result,
-      waktu:new Date().toISOString()
-    };
-
-    db.ref("kunjungan").push(data);
-
-    alert("🔥 sukses");
-
-    kode.value="";
-    nama.value="";
-    search.value="";
-  };
-
-  if(file) reader.readAsDataURL(file);
-  else reader.onload();
+  alert("🔥 sukses");
 }
-
-// 🔥 SPLASH FIX (ANTI NYANGKUT)
-setTimeout(()=>{
-  document.getElementById("splash").style.display="none";
-},1500);
 </script>
 
 </body>
