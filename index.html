@@ -1,91 +1,167 @@
 ﻿<!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16a34a">
+
 <title>GEOTAGGING SYSTEM</title>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
 <style>
-body {
-  font-family: Arial;
-  background: linear-gradient(135deg,#2ecc71,#27ae60);
+html, body{
+  height:100%;
   margin:0;
-  padding:20px;
-  color:#333;
+  padding:0;
 }
 
-.container {
-  max-width:400px;
-  margin:auto;
+body{
+  font-family:Segoe UI;
+  background:linear-gradient(#22c55e,#6ee7b7);
+  display:flex;
+  flex-direction:column;
 }
 
-.card {
-  background:white;
+.header{
+  background:#16a34a;
+  color:white;
   padding:15px;
-  margin-bottom:15px;
-  border-radius:12px;
+  text-align:center;
+  font-weight:bold;
 }
 
-input {
+.progress{
+  text-align:center;
+  color:white;
+  font-weight:bold;
+  margin:5px 0;
+}
+
+.container{
+  flex:1;
+  max-width:400px;
+  width:100%;
+  margin:auto;
+  padding:10px;
+}
+
+.card{
+  background:white;
+  padding:12px;
+  border-radius:12px;
+  margin-bottom:10px;
+}
+
+select,input,textarea{
   width:100%;
   padding:10px;
   border-radius:8px;
   border:1px solid #ccc;
 }
 
-button {
+button{
   width:100%;
-  padding:15px;
+  padding:14px;
   border:none;
   border-radius:10px;
-  background:#27ae60;
+  background:#ef4444;
   color:white;
   font-size:16px;
-  cursor:pointer;
 }
 
-button:disabled {
-  background:gray;
+button.loading{
+  animation: blink 0.6s infinite;
+}
+
+@keyframes blink{
+  0%{background:#ef4444;}
+  50%{background:#dc2626;}
+  100%{background:#ef4444;}
+}
+
+#map{
+  height:200px;
+  border-radius:10px;
+}
+
+.status{
+  text-align:center;
+  font-size:13px;
+  margin-top:5px;
+  font-weight:bold;
+}
+
+.footer{
+  background:#16a34a;
+  text-align:center;
+  color:white;
+  font-size:12px;
+  padding:10px;
 }
 </style>
 
 </head>
+
 <body>
+
+<div class="header">SCANIT-TRS GEOTAGING</div>
+<div class="progress" id="progress">Firebase Ready</div>
 
 <div class="container">
 
-<h2 style="text-align:center;color:white;">GEOTAGGING SYSTEM</h2>
-
 <div class="card">
-<label>Salesman</label>
-<input id="salesman">
-</div>
-
-<div class="card">
-<label>Cabang</label>
-<input id="cabang">
+<label>🙍‍♂️ Salesman</label>
+<select id="salesman">
+<option>budi</option>
+<option>andi</option>
+<option>sasa</option>
+</select>
 </div>
 
 <div class="card">
-<label>Customer</label>
-<input id="customer">
+<label>🏬 Cabang</label>
+<select id="cabang">
+<option>SOLO</option>
+<option>JOGJA</option>
+<option>SEMARANG</option>
+</select>
 </div>
 
 <div class="card">
-<label>Alamat</label>
-<input id="alamat">
+<label>🏪 Customer</label>
+<input id="customer" placeholder="Input customer">
 </div>
 
-<button id="btnKirim" onclick="kirimData()">KIRIM DATA</button>
+<div class="card">
+<label>📌 Alamat</label>
+<textarea id="alamat"></textarea>
+</div>
+
+<div class="card">
+<label>📍 Map</label>
+<div id="map"></div>
+</div>
+
+<div class="card">
+<label>📸 Foto</label>
+<input type="file" id="foto" accept="image/*" capture="environment">
+</div>
+
+<div class="card">
+<button id="btn" onclick="kirim()">🚀 SEND VALIDATION</button>
+<div class="status" id="status">Menunggu GPS...</div>
+</div>
 
 </div>
 
-<!-- 🔥 FIREBASE WAJIB -->
+<div class="footer">Powered by BITS-YGY</div>
+
+<!-- 🔥 FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
-// 🔥 CONFIG FIREBASE (SUDAH FIX REGION)
 const firebaseConfig = {
   apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
   authDomain: "geotagging-system.firebaseapp.com",
@@ -96,80 +172,79 @@ const firebaseConfig = {
   appId: "1:954782185667:web:96ee2d0726a2708f39ca76"
 };
 
-// 🔥 INIT FIREBASE
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+</script>
 
-// 🔥 GPS
-let latitude = null;
-let longitude = null;
+<!-- 🔥 MAP -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-navigator.geolocation.getCurrentPosition(
-  (pos) => {
-    latitude = pos.coords.latitude;
-    longitude = pos.coords.longitude;
-    console.log("GPS:", latitude, longitude);
-  },
-  (err) => {
-    alert("GPS gagal: " + err.message);
-  }
-);
+<script>
+let lat,lng,map;
 
-// 🔥 KIRIM DATA
-function kirimData(){
+navigator.geolocation.getCurrentPosition(async pos=>{
 
-  const btn = document.getElementById("btnKirim");
-  btn.disabled = true;
-  btn.innerText = "Loading...";
+  lat = pos.coords.latitude;
+  lng = pos.coords.longitude;
 
-  const salesman = document.getElementById("salesman").value;
-  const cabang = document.getElementById("cabang").value;
-  const customer = document.getElementById("customer").value;
-  const alamat = document.getElementById("alamat").value;
+  document.getElementById("status").innerText = "📍 GPS SIAP";
 
-  // VALIDASI
-  if(!salesman || !cabang || !customer || !alamat){
-    alert("❌ Semua field wajib diisi!");
-    btn.disabled = false;
-    btn.innerText = "KIRIM DATA";
+  map = L.map('map').setView([lat,lng],15);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  L.marker([lat,lng]).addTo(map);
+
+  let res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+  let data = await res.json();
+
+  document.getElementById("alamat").value = data.display_name;
+
+});
+
+// 🔥 KIRIM DATA KE FIREBASE
+async function kirim(){
+
+  let btn = document.getElementById("btn");
+  btn.classList.add("loading");
+
+  let file = document.getElementById("foto").files[0];
+
+  if(!file){
+    alert("Foto wajib!");
+    btn.classList.remove("loading");
     return;
   }
 
-  if(latitude === null){
-    alert("❌ GPS belum siap");
-    btn.disabled = false;
-    btn.innerText = "KIRIM DATA";
-    return;
-  }
+  let reader = new FileReader();
 
-  const data = {
-    salesman,
-    cabang,
-    customer,
-    alamat,
-    lat: latitude,
-    lng: longitude,
-    waktu: new Date().toISOString()
+  reader.onload = async function(){
+
+    const data = {
+      salesman: document.getElementById("salesman").value,
+      cabang: document.getElementById("cabang").value,
+      customer: document.getElementById("customer").value,
+      lat: lat,
+      lng: lng,
+      alamat: document.getElementById("alamat").value,
+      foto: reader.result,
+      waktu: new Date().toISOString()
+    };
+
+    try{
+      await db.ref("geotagging").push(data);
+
+      btn.classList.remove("loading");
+      alert("🔥 DATA MASUK FIREBASE!");
+      location.reload();
+
+    }catch(err){
+      btn.classList.remove("loading");
+      alert("❌ ERROR: " + err.message);
+    }
+
   };
 
-  db.ref("data").push(data)
-    .then(() => {
-      alert("🔥 Data masuk Firebase!");
-
-      document.getElementById("salesman").value = "";
-      document.getElementById("cabang").value = "";
-      document.getElementById("customer").value = "";
-      document.getElementById("alamat").value = "";
-
-      btn.disabled = false;
-      btn.innerText = "KIRIM DATA";
-    })
-    .catch(err => {
-      alert("❌ Error: " + err.message);
-      btn.disabled = false;
-      btn.innerText = "KIRIM DATA";
-    });
-
+  reader.readAsDataURL(file);
 }
 </script>
 
