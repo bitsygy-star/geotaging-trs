@@ -12,7 +12,7 @@
 body{
   margin:0;
   font-family:Arial;
-  background:linear-gradient(135deg,#2ecc71,#27ae60);
+  background:linear-gradient(135deg,#27ae60,#2ecc71);
 }
 
 .container{
@@ -24,37 +24,34 @@ body{
 .title{
   text-align:center;
   color:white;
-  font-size:22px;
-}
-
-.progress{
-  text-align:center;
-  color:white;
+  font-weight:bold;
 }
 
 .card{
   background:white;
   padding:12px;
-  margin:10px 0;
   border-radius:12px;
+  margin-bottom:12px;
 }
 
-input,select,textarea{
+select,input,textarea{
   width:100%;
   padding:10px;
   border-radius:8px;
   border:1px solid #ccc;
-  margin-top:5px;
 }
 
 #list{
-  max-height:200px;
+  max-height:150px;
   overflow:auto;
+  border:1px solid #ccc;
+  border-radius:8px;
+  margin-top:5px;
   display:none;
 }
 
 .item{
-  padding:10px;
+  padding:8px;
   border-bottom:1px solid #eee;
   cursor:pointer;
 }
@@ -70,21 +67,30 @@ button{
   border-radius:10px;
   background:#e74c3c;
   color:white;
+  font-size:16px;
 }
 
 #map{
-  height:200px;
+  height:180px;
   border-radius:10px;
 }
-</style>
-</head>
 
+.status{
+  background:white;
+  padding:10px;
+  border-radius:10px;
+  margin-top:10px;
+  text-align:center;
+}
+</style>
+
+</head>
 <body>
 
 <div class="container">
 
-<div class="title">SCANIT-TRS</div>
-<div class="progress" id="progress">0/0 selesai</div>
+<h2 class="title">SCANIT-TRS</h2>
+<div class="title" id="progress">0/0 selesai</div>
 
 <div class="card">
 <select id="sales"></select>
@@ -105,7 +111,7 @@ button{
 </div>
 
 <div class="card">
-<textarea id="alamat" placeholder="Alamat otomatis"></textarea>
+<textarea id="alamat" placeholder="Alamat"></textarea>
 </div>
 
 <div class="card">
@@ -113,76 +119,79 @@ button{
 </div>
 
 <div class="card">
-<input type="file">
+<input type="file" id="foto">
 </div>
 
-<div class="card" id="gps">📍 GPS loading...</div>
+<div class="status" id="gps">📍 GPS loading...</div>
 
 <button onclick="kirim()">🚀 KIRIM DATA</button>
 
 </div>
 
+<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<!-- LEAFLET -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "geotagging-system.firebaseapp.com",
-  databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app"
-};
+// 🔥 CONFIG
+firebase.initializeApp({
+  apiKey:"AIzaSy",
+  authDomain:"geotagging-system.firebaseapp.com",
+  databaseURL:"https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+});
 
-firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// =========================
+// GLOBAL
+// =========================
 let outlets = {};
 let listData = [];
-let selected = null;
+let lat=0, lng=0;
+let selectedKode=null;
 
-// 🔥 LOAD DATA + CLEAN
-db.ref("outlets").once("value", snap=>{
+// =========================
+// LOAD DATA
+// =========================
+db.ref("outlets").once("value",(snap)=>{
   const data = snap.val();
 
-  Object.keys(data).forEach(k=>{
+  for(let k in data){
     const o = data[k];
 
-    // 🔥 FILTER DATA KOTOR
-    if(
-      !o ||
-      !o.Salesman ||
-      !o.Cabang ||
-      !o.Kode ||
-      !o.Nama
-    ) return;
-
     outlets[k]={
-      kode:o.Kode,
-      nama:o.Nama,
-      cabang:o.Cabang,
-      sales:o.Salesman
+      kode: o.Kode || o.kode || "",
+      nama: o.Nama || o.nama || "",
+      cabang: o.Cabang || o.cabang || "",
+      sales: o.Salesman || o.salesman || ""
     };
-  });
+  }
 
   initDropdown();
 });
 
-// 🔥 DROPDOWN
+// =========================
+// DROPDOWN
+// =========================
 function initDropdown(){
-  const sSet=new Set();
-  const cSet=new Set();
+  const sales = document.getElementById("sales");
+  const cabang = document.getElementById("cabang");
+
+  let sSet=new Set(), cSet=new Set();
 
   Object.values(outlets).forEach(o=>{
     if(o.sales) sSet.add(o.sales);
     if(o.cabang) cSet.add(o.cabang);
   });
 
-  sales.innerHTML="<option value=''>Pilih Sales</option>";
-  cabang.innerHTML="<option value=''>Pilih Cabang</option>";
+  sales.innerHTML="<option>Pilih Sales</option>";
+  cabang.innerHTML="<option>Pilih Cabang</option>";
 
   sSet.forEach(s=>{
-    if(s !== "undefined")
-      sales.innerHTML += `<option>${s}</option>`;
+    sales.innerHTML += `<option>${s}</option>`;
   });
 
   cSet.forEach(c=>{
@@ -190,96 +199,152 @@ function initDropdown(){
   });
 }
 
-// 🔥 FILTER
+// =========================
+// FILTER
+// =========================
+document.getElementById("sales").onchange = filter;
+document.getElementById("cabang").onchange = filter;
+
 function filter(){
   const s = sales.value;
   const c = cabang.value;
 
   listData = Object.values(outlets).filter(o=>{
-    return (!s || o.sales===s) && (!c || o.cabang===c);
+    return o.sales==s && o.cabang==c;
   });
+
+  updateProgress();
 }
 
-// 🔥 SEARCH
-search.oninput=()=>{
-  filter();
+// =========================
+// SEARCH
+// =========================
+search.oninput = function(){
+  const q = this.value.toLowerCase();
 
-  const q=search.value.toLowerCase();
-
-  const result=listData.filter(o=>
-    o.nama.toLowerCase().includes(q) ||
-    o.kode.toLowerCase().includes(q)
-  );
-
-  render(result);
-};
-
-// 🔥 RENDER LIST
-function render(arr){
-  list.style.display="block";
-
-  if(arr.length===0){
-    list.innerHTML="<div class='item'>Tidak ditemukan</div>";
+  if(!q){
+    list.style.display="none";
     return;
   }
 
-  list.innerHTML=arr.map(o=>`
-    <div class="item" onclick="pilih('${o.kode}')">
+  list.style.display="block";
+
+  const result = listData.filter(o=>
+    (o.nama || "").toLowerCase().includes(q) ||
+    (o.kode || "").toLowerCase().includes(q)
+  );
+
+  list.innerHTML = result.map(o=>
+    `<div class="item" onclick="pilih('${o.kode}')">
       ${o.kode} - ${o.nama}
-    </div>
-  `).join("");
-}
+    </div>`
+  ).join("");
+};
 
-// 🔥 PILIH OUTLET
-function pilih(k){
-  const o=Object.values(outlets).find(x=>x.kode===k);
+// =========================
+// PILIH
+// =========================
+function pilih(kode){
+  const o = listData.find(x=>x.kode==kode);
 
-  selected=o;
+  selectedKode = kode;
 
-  kode.value=o.kode;
-  nama.value=o.nama;
+  document.getElementById("kode").value = o.kode;
+  document.getElementById("nama").value = o.nama;
 
   list.style.display="none";
 }
 
-// 🔥 MAP + GPS + AUTO ALAMAT
-let lat,lng;
-
-const map=L.map('map').setView([-7.7,110.5],13);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-navigator.geolocation.getCurrentPosition(async pos=>{
-  lat=pos.coords.latitude;
-  lng=pos.coords.longitude;
+// =========================
+// GPS + MAP
+// =========================
+navigator.geolocation.getCurrentPosition(pos=>{
+  lat = pos.coords.latitude;
+  lng = pos.coords.longitude;
 
   gps.innerText="📍 GPS AKTIF";
 
-  map.setView([lat,lng],16);
-  L.marker([lat,lng]).addTo(map);
-
-  // 🔥 AUTO ALAMAT
-  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
-  const data = await res.json();
-
-  alamat.value = data.display_name;
+  initMap();
+  getAlamat();
 
 }, err=>{
   gps.innerText="❌ GPS gagal";
 });
 
-// 🔥 KIRIM
-function kirim(){
-  if(!selected) return alert("Pilih outlet dulu");
+function initMap(){
+  const map = L.map('map').setView([lat,lng], 15);
 
-  db.ref("checkin").push({
-    ...selected,
-    lat,
-    lng,
-    waktu:new Date().toISOString()
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  L.marker([lat,lng]).addTo(map);
+}
+
+// =========================
+// AUTO ALAMAT
+// =========================
+function getAlamat(){
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+  .then(res=>res.json())
+  .then(d=>{
+    alamat.value = d.display_name;
   });
+}
 
-  alert("🔥 Data berhasil dikirim");
+// =========================
+// PROGRESS
+// =========================
+function updateProgress(){
+  let total = listData.length;
+  let done = JSON.parse(localStorage.getItem("done")||"[]");
+
+  progress.innerText = `${done.length}/${total} selesai`;
+}
+
+// =========================
+// KIRIM
+// =========================
+function kirim(){
+
+  if(!selectedKode){
+    alert("Pilih outlet dulu!");
+    return;
+  }
+
+  const file = foto.files[0];
+
+  const reader = new FileReader();
+
+  reader.onload = function(){
+
+    const base64 = reader.result;
+
+    const data = {
+      kode:selectedKode,
+      nama:nama.value,
+      sales:sales.value,
+      cabang:cabang.value,
+      alamat:alamat.value,
+      lat,lng,
+      foto:base64,
+      waktu:new Date().toISOString()
+    };
+
+    db.ref("transaksi").push(data);
+
+    let done = JSON.parse(localStorage.getItem("done")||"[]");
+    done.push(selectedKode);
+    localStorage.setItem("done", JSON.stringify(done));
+
+    alert("✅ Tersimpan");
+
+    location.reload();
+  };
+
+  if(file){
+    reader.readAsDataURL(file);
+  }else{
+    alert("Foto wajib!");
+  }
 }
 </script>
 
