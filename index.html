@@ -1,353 +1,137 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#16a34a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-
-<title>SCANIT-TRS GEO</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEOTAGGING SYSTEM</title>
 
 <style>
-
-html, body{
-  height:100%;
+body {
+  font-family: Arial;
+  background: linear-gradient(135deg,#2ecc71,#27ae60);
   margin:0;
-  padding:0;
-  overscroll-behavior:none;
+  padding:20px;
+  color:#333;
 }
 
-body{
-  font-family:Segoe UI;
-  background:linear-gradient(#22c55e,#6ee7b7);
-  display:flex;
-  flex-direction:column;
-}
-
-.header{
-  background:#16a34a;
-  color:white;
-  padding:15px;
-  text-align:center;
-  font-weight:bold;
-}
-
-.progress{
-  text-align:center;
-  color:white;
-  font-weight:bold;
-  margin:5px 0;
-}
-
-/* 🔥 CONTAINER FLEX FULLSCREEN */
-.container{
-  flex:1;
+.container {
   max-width:400px;
-  width:100%;
   margin:auto;
-  padding:10px;
 }
 
-.card{
+.card {
   background:white;
-  padding:12px;
+  padding:15px;
+  margin-bottom:15px;
   border-radius:12px;
-  margin-bottom:10px;
 }
 
-select,input,textarea{
+input, select {
   width:100%;
   padding:10px;
   border-radius:8px;
   border:1px solid #ccc;
-  box-sizing:border-box;
 }
 
-textarea{
-  resize:none;
-}
-
-button{
+button {
   width:100%;
-  padding:14px;
+  padding:15px;
   border:none;
   border-radius:10px;
-  background:#ef4444;
+  background:#27ae60;
   color:white;
   font-size:16px;
 }
-
-/* 🔥 tombol kedip */
-button.loading{
-  animation: blink 0.6s infinite;
-}
-
-@keyframes blink{
-  0%{background:#ef4444;}
-  50%{background:#dc2626;}
-  100%{background:#ef4444;}
-}
-
-button:active{
-  transform:scale(0.96);
-}
-
-#map{
-  height:200px;
-  border-radius:10px;
-}
-
-.status{
-  text-align:center;
-  font-size:13px;
-  margin-top:5px;
-  font-weight:bold;
-}
-
-/* 🔥 FOOTER NEMPEL BAWAH */
-.footer{
-  background:#16a34a;
-  text-align:center;
-  color:white;
-  font-size:12px;
-  padding:10px;
-}
-
 </style>
 
 </head>
-
 <body>
-
-<div class="header">GEOTAGING SYSTEM</div>
-<div class="progress" id="progress">Loading...</div>
 
 <div class="container">
 
-<div class="card">
-<label>🙍‍♂️ Salesman</label>
-<select id="salesman"></select>
-</div>
+<h2 style="text-align:center;color:white;">GEOTAGGING SYSTEM</h2>
 
 <div class="card">
-<label>🏬 Cabang</label>
-<select id="cabang"></select>
+<label>Salesman</label>
+<input id="salesman">
 </div>
 
 <div class="card">
-<label>🔎 Search Customer</label>
-<input id="search" placeholder="Ketik kode outlet...">
+<label>Cabang</label>
+<input id="cabang">
 </div>
 
 <div class="card">
-<label>🏪 Customer</label>
-<select id="customer"></select>
+<label>Customer</label>
+<input id="customer">
 </div>
 
 <div class="card">
-<label>📌 Alamat</label>
-<textarea id="alamat"></textarea>
+<label>Alamat</label>
+<input id="alamat">
 </div>
 
-<div class="card">
-<label>📍 Map</label>
-<div id="map"></div>
-</div>
-
-<div class="card">
-<label>📸 Foto</label>
-<input type="file" id="foto" accept="image/*" capture="environment">
-</div>
-
-<div class="card">
-<button id="btn" onclick="kirim()">🚀 SEND VALIDATION</button>
-<div class="status" id="status">Menunggu GPS...</div>
-</div>
+<button onclick="kirimData()">KIRIM DATA</button>
 
 </div>
 
-<div class="footer">Powered by BITS-YGY</div>
-
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- 🔥 FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
+  authDomain: "geotagging-system.firebaseapp.com",
+  databaseURL: "https://geotagging-system-default-rtdb.firebaseio.com/",
+  projectId: "geotagging-system",
+  storageBucket: "geotagging-system.firebasestorage.app",
+  messagingSenderId: "954782185667",
+  appId: "1:954782185667:web:96ee2d0726a2708f39ca76"
+};
 
-const API_URL = "https://script.google.com/macros/s/AKfycbzJU67FkFZYFBXqrKVf49_EpOJad9uDJAkt9sRWDm8hnHTI4AbfF9D5v0Zc0A-FCDqiEQ/exec";
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
 
-let masterData = [];
-let usedCustomer = [];
-let lat,lng,map;
+<script>
+// 🔥 AMBIL GPS
+let latitude = 0;
+let longitude = 0;
 
-function getKode(text){
-  return text.split("-")[0].trim().toUpperCase();
-}
-
-async function loadMaster(){
-
-  let res = await fetch(API_URL);
-  let data = await res.json();
-
-  masterData = data.master;
-  usedCustomer = data.used;
-
-  initSalesman();
-}
-
-function initSalesman(){
-
-  let s = document.getElementById("salesman");
-  let unique = [...new Set(masterData.map(d=>d.salesman))];
-
-  s.innerHTML="";
-
-  unique.forEach(v=>{
-    let opt=document.createElement("option");
-    opt.value=v;
-    opt.text=v;
-    s.appendChild(opt);
-  });
-
-  filterCabang();
-}
-
-function filterCabang(){
-
-  let sales = document.getElementById("salesman").value;
-
-  let filtered = masterData.filter(d=>d.salesman==sales);
-  let cabangList = [...new Set(filtered.map(d=>d.cabang))];
-
-  let c = document.getElementById("cabang");
-  c.innerHTML="";
-
-  cabangList.forEach(v=>{
-    let opt=document.createElement("option");
-    opt.value=v;
-    opt.text=v;
-    c.appendChild(opt);
-  });
-
-  loadCustomer();
-}
-
-function loadCustomer(){
-
-  let sales = document.getElementById("salesman").value;
-  let cab = document.getElementById("cabang").value;
-
-  let filtered = masterData.filter(d=>d.salesman==sales && d.cabang==cab);
-
-  let c = document.getElementById("customer");
-  c.innerHTML="";
-
-  let total = filtered.length;
-  let done = 0;
-
-  filtered.forEach(v=>{
-
-    let kode = getKode(v.customer);
-
-    if(usedCustomer.includes(kode)){
-      done++;
-      return;
-    }
-
-    let opt=document.createElement("option");
-    opt.value = v.customer;
-    opt.text = v.customer;
-    c.appendChild(opt);
-
-  });
-
-  document.getElementById("progress").innerText =
-    done + " / " + total + " outlet selesai";
-}
-
-document.getElementById("search").addEventListener("input",function(){
-
-  let keyword = this.value.toLowerCase();
-  let options = document.getElementById("customer").options;
-
-  for(let i=0;i<options.length;i++){
-    options[i].style.display =
-      options[i].text.toLowerCase().includes(keyword) ? "" : "none";
+navigator.geolocation.getCurrentPosition(
+  (pos) => {
+    latitude = pos.coords.latitude;
+    longitude = pos.coords.longitude;
+    console.log("GPS:", latitude, longitude);
+  },
+  (err) => {
+    alert("GPS gagal: " + err.message);
   }
+);
 
-});
+// 🔥 KIRIM DATA
+function kirimData(){
 
-navigator.geolocation.getCurrentPosition(async pos=>{
-
-  lat = pos.coords.latitude;
-  lng = pos.coords.longitude;
-
-  document.getElementById("status").innerText = "📍 GPS SIAP";
-
-  map = L.map('map').setView([lat,lng],15);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-  L.marker([lat,lng]).addTo(map);
-
-  let res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-  let data = await res.json();
-
-  document.getElementById("alamat").value = data.display_name;
-
-});
-
-function kirim(){
-
-  let btn = document.getElementById("btn");
-  btn.classList.add("loading");
-
-  let file = document.getElementById("foto").files[0];
-
-  if(!file){
-    alert("Foto wajib!");
-    btn.classList.remove("loading");
-    return;
-  }
-
-  let reader = new FileReader();
-
-  reader.onload = async function(){
-
-    let formData = new FormData();
-
-    formData.append("data", JSON.stringify({
-      salesman:document.getElementById("salesman").value,
-      cabang:document.getElementById("cabang").value,
-      customer:document.getElementById("customer").value,
-      lat:lat,
-      lng:lng,
-      alamat:document.getElementById("alamat").value,
-      foto:reader.result
-    }));
-
-    let res = await fetch(API_URL,{method:"POST",body:formData});
-    let text = await res.text();
-
-    btn.classList.remove("loading");
-
-    if(text.includes("OK")){
-      alert("✅ BERHASIL");
-      location.reload();
-    }else{
-      alert("❌ GAGAL");
-    }
-
+  const data = {
+    salesman: document.getElementById("salesman").value,
+    cabang: document.getElementById("cabang").value,
+    customer: document.getElementById("customer").value,
+    alamat: document.getElementById("alamat").value,
+    lat: latitude,
+    lng: longitude,
+    waktu: new Date().toISOString()
   };
 
-  reader.readAsDataURL(file);
+  db.ref("data").push(data)
+    .then(() => {
+      alert("🔥 Data masuk Firebase!");
+    })
+    .catch(err => {
+      alert("Error: " + err);
+    });
+
 }
-
-loadMaster();
-
-document.getElementById("salesman").addEventListener("change",filterCabang);
-document.getElementById("cabang").addEventListener("change",loadCustomer);
-
 </script>
 
 </body>
