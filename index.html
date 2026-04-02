@@ -5,11 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SCANIT-TRS</title>
 
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#27ae60">
-<meta name="apple-mobile-web-app-capable" content="yes">
-
 <!-- MAP -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -45,7 +40,6 @@ body{
   padding:12px;
   margin-bottom:12px;
   border-radius:12px;
-  box-shadow:0 4px 10px rgba(0,0,0,0.1);
 }
 
 select,input,textarea{
@@ -76,7 +70,7 @@ select,input,textarea{
 }
 
 #map{
-  height:220px;
+  height:200px;
   border-radius:10px;
 }
 
@@ -87,7 +81,6 @@ button{
   border-radius:10px;
   background:#e74c3c;
   color:white;
-  font-size:16px;
 }
 </style>
 </head>
@@ -110,11 +103,11 @@ SCANIT-TRS
 <div class="progress" id="progress">0/0 selesai</div>
 
 <div class="card">
-<select id="salesman"></select>
+<select id="salesman"><option>Loading...</option></select>
 </div>
 
 <div class="card">
-<select id="cabang"></select>
+<select id="cabang"><option>Loading...</option></select>
 </div>
 
 <div class="card">
@@ -150,31 +143,36 @@ SCANIT-TRS
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
-// 🔥 CONFIG (ISI PUNYAMU)
+console.log("APP START");
+
+// 🔥 CONFIG LU (SUDAH BENER DARI SEBELUMNYA)
 const firebaseConfig = {
-  apiKey: "ISI_APIKEY",
-  authDomain: "ISI",
-  databaseURL: "ISI",
-  projectId: "ISI"
+  apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
+  authDomain: "geotagging-system.firebaseapp.com",
+  databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "geotagging-system"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let allData={}, submitted={};
-let lat=null,lng=null;
-let map,marker;
+let allData = {};
+let submitted = {};
+let lat=null, lng=null;
+let map, marker;
 
-// LOAD DATA
-db.ref("outlets").once("value",snap=>{
-  allData=snap.val()||{};
+// 🔥 LOAD DATA OUTLET
+db.ref("outlets").once("value", snap=>{
+  allData = snap.val() || {};
+
+  console.log("DATA:", allData);
 
   let sSet=new Set();
   let cSet=new Set();
 
   Object.values(allData).forEach(d=>{
-    sSet.add(d.Salesman||d.salesman);
-    cSet.add(d.Cabang||d.cabang);
+    sSet.add(d.Salesman);
+    cSet.add(d.Cabang);
   });
 
   salesman.innerHTML="<option>Pilih Sales</option>";
@@ -184,16 +182,16 @@ db.ref("outlets").once("value",snap=>{
   cSet.forEach(c=>cabang.innerHTML+=`<option>${c}</option>`);
 });
 
-// DATA SUDAH DIKIRIM
-db.ref("kunjungan").on("value",snap=>{
+// 🔥 DATA SUDAH DIISI
+db.ref("kunjungan").on("value", snap=>{
   submitted={};
   snap.forEach(d=>{
     submitted[d.val().kode]=true;
   });
 });
 
-// GPS
-navigator.geolocation.watchPosition(async pos=>{
+// 🔥 GPS
+navigator.geolocation.watchPosition(pos=>{
   lat=pos.coords.latitude;
   lng=pos.coords.longitude;
 
@@ -204,40 +202,20 @@ navigator.geolocation.watchPosition(async pos=>{
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     marker=L.marker([lat,lng]).addTo(map);
   }else{
-    map.setView([lat,lng]);
     marker.setLatLng([lat,lng]);
   }
-
-  try{
-    let res=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
-    let data=await res.json();
-    alamat.value=data.display_name;
-  }catch{}
-},
-err=>{
+}, err=>{
   gpsInfo.innerText="❌ GPS ERROR";
 });
 
-// SEARCH
-search.addEventListener("focus",()=>list.style.display="block");
+// 🔥 SEARCH
+search.addEventListener("input", render);
+salesman.addEventListener("change", render);
+cabang.addEventListener("change", render);
 
-document.addEventListener("click",(e)=>{
-  if(!e.target.closest("#search")&&!e.target.closest("#list")){
-    list.style.display="none";
-  }
-});
-
-search.addEventListener("input",render);
-salesman.addEventListener("change",render);
-cabang.addEventListener("change",render);
-
-// RENDER
 function render(){
 
-  if(!salesman.value || !cabang.value){
-    list.innerHTML="<div class='item'>Pilih dulu</div>";
-    return;
-  }
+  if(!salesman.value || !cabang.value) return;
 
   let s=salesman.value;
   let c=cabang.value;
@@ -250,19 +228,17 @@ function render(){
 
   Object.keys(allData).forEach(k=>{
     let d=allData[k];
-    let nama=(d.Nama||d.nama||"").toLowerCase();
-    let sales=d.Salesman||d.salesman;
-    let cab=d.Cabang||d.cabang;
+    let nama=d.Nama.toLowerCase();
 
-    if(sales==s && cab==c){
+    if(d.Salesman==s && d.Cabang==c){
       total++;
 
-      if(submitted[k]){done++;return;}
+      if(submitted[k]){done++; return;}
 
       if(!key || nama.includes(key)){
         list.innerHTML+=`
         <div class="item" onclick="pilih('${k}')">
-          ${d.Nama||d.nama}
+          ${d.Nama}
         </div>`;
       }
     }
@@ -271,19 +247,18 @@ function render(){
   progress.innerText=`${done}/${total} selesai`;
 }
 
-// PILIH
 function pilih(id){
   let d=allData[id];
   kode.value=id;
-  nama.value=d.Nama||d.nama;
+  nama.value=d.Nama;
   list.style.display="none";
 }
 
-// KIRIM
+// 🔥 KIRIM
 function kirim(){
 
   if(!kode.value){
-    alert("pilih outlet dulu");
+    alert("Pilih outlet dulu!");
     return;
   }
 
@@ -291,8 +266,6 @@ function kirim(){
   let reader=new FileReader();
 
   reader.onload=function(){
-    let base64=reader.result;
-
     let data={
       salesman:salesman.value,
       cabang:cabang.value,
@@ -300,13 +273,13 @@ function kirim(){
       nama:nama.value,
       alamat:alamat.value,
       lat,lng,
-      foto:base64,
+      foto:reader.result,
       waktu:new Date().toISOString()
     };
 
     db.ref("kunjungan").push(data);
 
-    alert("🔥 berhasil");
+    alert("🔥 sukses");
 
     kode.value="";
     nama.value="";
@@ -317,12 +290,10 @@ function kirim(){
   else reader.onload();
 }
 
-// SPLASH
-window.onload=()=>{
-  setTimeout(()=>{
-    document.getElementById("splash").style.display="none";
-  },1000);
-};
+// 🔥 SPLASH FIX (ANTI NYANGKUT)
+setTimeout(()=>{
+  document.getElementById("splash").style.display="none";
+},1500);
 </script>
 
 </body>
