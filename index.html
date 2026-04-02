@@ -85,10 +85,11 @@ button:disabled {
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
+// 🔥 CONFIG FIREBASE (SUDAH FIX)
 const firebaseConfig = {
   apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
   authDomain: "geotagging-system.firebaseapp.com",
-  databaseURL: "databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app"",
+  databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "geotagging-system",
   storageBucket: "geotagging-system.firebasestorage.app",
   messagingSenderId: "954782185667",
@@ -115,7 +116,7 @@ navigator.geolocation.getCurrentPosition(
   }
 );
 
-// 🔥 VALIDASI + KIRIM
+// 🔥 KIRIM DATA
 function kirimData(){
 
   const btn = document.getElementById("btnKirim");
@@ -127,7 +128,7 @@ function kirimData(){
   const customer = document.getElementById("customer").value;
   const alamat = document.getElementById("alamat").value;
 
-  // 🔥 VALIDASI INPUT
+  // VALIDASI
   if(!salesman || !cabang || !customer || !alamat){
     alert("❌ Semua field wajib diisi!");
     btn.disabled = false;
@@ -135,19 +136,18 @@ function kirimData(){
     return;
   }
 
-  // 🔥 VALIDASI GPS
   if(latitude === null){
-    alert("❌ GPS belum aktif / belum terbaca");
+    alert("❌ GPS belum aktif");
     btn.disabled = false;
     btn.innerText = "KIRIM DATA";
     return;
   }
 
   const data = {
-    salesman,
-    cabang,
-    customer,
-    alamat,
+    salesman: salesman,
+    cabang: cabang,
+    customer: customer,
+    alamat: alamat,
     lat: latitude,
     lng: longitude,
     waktu: new Date().toISOString()
