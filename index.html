@@ -26,7 +26,7 @@ body {
   border-radius:12px;
 }
 
-input, select {
+input {
   width:100%;
   padding:10px;
   border-radius:8px;
@@ -41,6 +41,11 @@ button {
   background:#27ae60;
   color:white;
   font-size:16px;
+  cursor:pointer;
+}
+
+button:disabled {
+  background:gray;
 }
 </style>
 
@@ -71,7 +76,7 @@ button {
 <input id="alamat">
 </div>
 
-<button onclick="kirimData()">KIRIM DATA</button>
+<button id="btnKirim" onclick="kirimData()">KIRIM DATA</button>
 
 </div>
 
@@ -95,9 +100,9 @@ const db = firebase.database();
 </script>
 
 <script>
-// 🔥 AMBIL GPS
-let latitude = 0;
-let longitude = 0;
+// 🔥 GPS
+let latitude = null;
+let longitude = null;
 
 navigator.geolocation.getCurrentPosition(
   (pos) => {
@@ -110,14 +115,39 @@ navigator.geolocation.getCurrentPosition(
   }
 );
 
-// 🔥 KIRIM DATA
+// 🔥 VALIDASI + KIRIM
 function kirimData(){
 
+  const btn = document.getElementById("btnKirim");
+  btn.disabled = true;
+  btn.innerText = "Loading...";
+
+  const salesman = document.getElementById("salesman").value;
+  const cabang = document.getElementById("cabang").value;
+  const customer = document.getElementById("customer").value;
+  const alamat = document.getElementById("alamat").value;
+
+  // 🔥 VALIDASI INPUT
+  if(!salesman || !cabang || !customer || !alamat){
+    alert("❌ Semua field wajib diisi!");
+    btn.disabled = false;
+    btn.innerText = "KIRIM DATA";
+    return;
+  }
+
+  // 🔥 VALIDASI GPS
+  if(latitude === null){
+    alert("❌ GPS belum aktif / belum terbaca");
+    btn.disabled = false;
+    btn.innerText = "KIRIM DATA";
+    return;
+  }
+
   const data = {
-    salesman: document.getElementById("salesman").value,
-    cabang: document.getElementById("cabang").value,
-    customer: document.getElementById("customer").value,
-    alamat: document.getElementById("alamat").value,
+    salesman,
+    cabang,
+    customer,
+    alamat,
     lat: latitude,
     lng: longitude,
     waktu: new Date().toISOString()
@@ -126,9 +156,20 @@ function kirimData(){
   db.ref("data").push(data)
     .then(() => {
       alert("🔥 Data masuk Firebase!");
+
+      // reset form
+      document.getElementById("salesman").value = "";
+      document.getElementById("cabang").value = "";
+      document.getElementById("customer").value = "";
+      document.getElementById("alamat").value = "";
+
+      btn.disabled = false;
+      btn.innerText = "KIRIM DATA";
     })
     .catch(err => {
-      alert("Error: " + err);
+      alert("❌ Error: " + err.message);
+      btn.disabled = false;
+      btn.innerText = "KIRIM DATA";
     });
 
 }
