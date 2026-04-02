@@ -80,12 +80,12 @@ button:disabled {
 
 </div>
 
-<!-- 🔥 FIREBASE -->
+<!-- 🔥 FIREBASE WAJIB -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
-// 🔥 CONFIG FIREBASE (SUDAH FIX)
+// 🔥 CONFIG FIREBASE (SUDAH FIX REGION)
 const firebaseConfig = {
   apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
   authDomain: "geotagging-system.firebaseapp.com",
@@ -96,11 +96,10 @@ const firebaseConfig = {
   appId: "1:954782185667:web:96ee2d0726a2708f39ca76"
 };
 
+// 🔥 INIT FIREBASE
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-</script>
 
-<script>
 // 🔥 GPS
 let latitude = null;
 let longitude = null;
@@ -137,17 +136,17 @@ function kirimData(){
   }
 
   if(latitude === null){
-    alert("❌ GPS belum aktif");
+    alert("❌ GPS belum siap");
     btn.disabled = false;
     btn.innerText = "KIRIM DATA";
     return;
   }
 
   const data = {
-    salesman: salesman,
-    cabang: cabang,
-    customer: customer,
-    alamat: alamat,
+    salesman,
+    cabang,
+    customer,
+    alamat,
     lat: latitude,
     lng: longitude,
     waktu: new Date().toISOString()
@@ -157,7 +156,6 @@ function kirimData(){
     .then(() => {
       alert("🔥 Data masuk Firebase!");
 
-      // reset form
       document.getElementById("salesman").value = "";
       document.getElementById("cabang").value = "";
       document.getElementById("customer").value = "";
