@@ -320,44 +320,122 @@ document.getElementById("foto").addEventListener("change",(e)=>{
 });
 
 // ================= UPLOAD FOTO =================
-async function uploadFoto(){
+async function processAndUploadFoto(){
+
   if(!fileFoto) return "";
 
-  let ref=storage.ref("foto/"+Date.now());
-  await ref.put(fileFoto);
-  return await ref.getDownloadURL();
+  return new Promise((resolve)=>{
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+
+      const img = new Image();
+      img.src = e.target.result;
+
+      img.onload = async function(){
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // 🔥 resize
+        const MAX_WIDTH = 800;
+        let scale = MAX_WIDTH / img.width;
+
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scale;
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // 🔥 WATERMARK
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+
+        ctx.fillStyle = "white";
+        ctx.font = "12px Arial";
+
+        const waktu = new Date().toLocaleString();
+        const gps = `Lat:${userLat?.toFixed(5)} Lng:${userLng?.toFixed(5)}`;
+
+        ctx.fillText(waktu, 10, canvas.height - 35);
+        ctx.fillText(gps, 10, canvas.height - 15);
+
+        // 🔥 convert ke blob
+        canvas.toBlob(async (blob)=>{
+
+          let ref = storage.ref("foto/"+Date.now()+".jpg");
+
+          await ref.put(blob);
+
+          let url = await ref.getDownloadURL();
+
+          resolve(url);
+
+        }, "image/jpeg", 0.7);
+      }
+    };
+
+    reader.readAsDataURL(fileFoto);
+  });
 }
 
 // ================= KIRIM =================
+let isUploading = false;
+
 async function kirimData(){
 
-  let salesman=document.getElementById("salesman").value;
-  let outlet=document.getElementById("outlet").value;
-
-  if(!salesman || !outlet){
-    alert("Lengkapi!");
+  if(isUploading){
+    alert("Tunggu bro, lagi upload...");
     return;
   }
 
-  let fotoURL=await uploadFoto();
+  let salesman = document.getElementById("salesman").value;
+  let outlet = document.getElementById("outlet").value;
 
-  db.ref("kunjungan").push({
-    salesman,
-    outlet,
-    lat:userLat,
-    lng:userLng,
-    foto:fotoURL,
-    waktu:new Date().toISOString()
-  });
+  if(!salesman || !outlet){
+    alert("Lengkapi data!");
+    return;
+  }
 
-  let hist=JSON.parse(localStorage.getItem("kunjungan"))||[];
-  hist.push(outlet);
-  localStorage.setItem("kunjungan",JSON.stringify(hist));
+  // ❌ CEK SUDAH VALIDASI
+  let hist = JSON.parse(localStorage.getItem("kunjungan"))||[];
 
-  alert("VALIDASI BERHASIL 🔥");
+  if(hist.includes(outlet)){
+    alert("Outlet sudah divalidasi ❌");
+    return;
+  }
 
-  renderOutlet(semuaOutlet);
-  updateProgress();
+  try{
+    isUploading = true;
+
+    alert("⏳ Uploading...");
+
+    let fotoURL = await processAndUploadFoto();
+
+    await db.ref("kunjungan").push({
+      salesman,
+      outlet,
+      lat:userLat,
+      lng:userLng,
+      foto:fotoURL,
+      waktu:new Date().toISOString()
+    });
+
+    // simpan local
+    hist.push(outlet);
+    localStorage.setItem("kunjungan",JSON.stringify(hist));
+
+    alert("✅ VALIDASI BERHASIL");
+
+    renderOutlet(semuaOutlet);
+    updateProgress();
+
+  }catch(e){
+    console.error(e);
+    alert("❌ Upload gagal");
+  }
+
+  isUploading = false;
 }
 
 // ================= PROGRESS =================
