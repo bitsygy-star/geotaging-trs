@@ -2,303 +2,304 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SCANIT-TRS</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<!-- LEAFLET -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
+*{box-sizing:border-box}
+
 body{
   margin:0;
   font-family:Segoe UI;
-  background:linear-gradient(135deg,#2ecc71,#27ae60);
-  color:#fff;
+  background:linear-gradient(180deg,#16a34a,#22c55e);
 }
 
-.container{
+.header{
+  text-align:center;
+  color:white;
+  padding:15px;
+  font-weight:bold;
+}
+
+.app{
   max-width:420px;
   margin:auto;
-  padding:20px;
-}
-
-h2{
-  text-align:center;
-  margin-bottom:5px;
-}
-
-.progress{
-  text-align:center;
-  margin-bottom:15px;
+  padding:10px;
 }
 
 .card{
-  background:#fff;
-  padding:12px;
-  border-radius:14px;
+  background:#f1f5f9;
+  border-radius:15px;
+  padding:15px;
   margin-bottom:12px;
+}
+
+label{
+  font-size:13px;
+  color:#334155;
 }
 
 select,input,textarea{
   width:100%;
-  padding:14px;
+  padding:12px;
+  margin-top:5px;
   border-radius:10px;
-  border:1px solid #ddd;
-  font-size:14px;
-}
-
-textarea{
-  resize:none;
-}
-
-#list{
-  background:#fff;
-  max-height:180px;
-  overflow:auto;
-  border-radius:10px;
-  display:none;
-}
-
-.item{
-  padding:10px;
-  border-bottom:1px solid #eee;
-  cursor:pointer;
-}
-
-.item:hover{
-  background:#f1f1f1;
-}
-
-#map{
-  height:200px;
-  border-radius:12px;
+  border:1px solid #cbd5e1;
 }
 
 button{
   width:100%;
-  padding:15px;
+  padding:14px;
   border:none;
   border-radius:12px;
-  background:#e74c3c;
-  color:#fff;
-  font-size:16px;
+  background:#ef4444;
+  color:white;
+  font-weight:bold;
 }
 
-.status{
+.progress{
   text-align:center;
-  margin-top:10px;
-  background:#fff;
-  color:#333;
-  padding:10px;
-  border-radius:10px;
+  color:white;
+  font-weight:bold;
+  margin-bottom:10px;
 }
 </style>
+
 </head>
 
 <body>
 
-<div class="container">
+<div class="header">SCANIT-TRS GEOTAGGING</div>
+<div class="progress" id="progress">0 / 0 outlet selesai</div>
 
-<h2>SCANIT-TRS</h2>
-<div class="progress" id="progress">0/0 selesai</div>
+<div class="app">
 
-<div class="card">
-<select id="sales">
-<option>Pilih Sales</option>
-</select>
+  <div class="card">
+    <label>Salesman</label>
+    <select id="salesman"></select>
+  </div>
+
+  <div class="card">
+    <label>Cabang</label>
+    <input type="text" id="cabang" readonly>
+  </div>
+
+  <div class="card">
+    <label>Outlet</label>
+    <select id="outlet"></select>
+  </div>
+
+  <div class="card">
+    <label>Kode Outlet</label>
+    <input type="text" id="kode_outlet" readonly>
+  </div>
+
+  <div class="card">
+    <label>Alamat</label>
+    <textarea id="alamat" readonly></textarea>
+  </div>
+
+  <div class="card">
+    <label>Map</label>
+    <div id="map" style="height:200px;border-radius:10px;"></div>
+  </div>
+
+  <div class="card">
+    <label>Foto</label>
+    <input type="file" id="foto" accept="image/*" capture="environment">
+    <img id="preview" style="width:100%;margin-top:10px;border-radius:10px;display:none;">
+  </div>
+
+  <button onclick="kirimData()">🚀 SEND VALIDATION</button>
+
 </div>
-
-<div class="card">
-<input id="cabang" placeholder="Cabang otomatis" readonly>
-</div>
-
-<div class="card">
-<input id="search" placeholder="Cari outlet...">
-<div id="list"></div>
-</div>
-
-<div class="card">
-<input id="kode" placeholder="Kode Outlet" readonly>
-<input id="nama" placeholder="Nama Outlet" readonly>
-</div>
-
-<div class="card">
-<textarea id="alamat" placeholder="Alamat"></textarea>
-</div>
-
-<div class="card">
-<div id="map"></div>
-</div>
-
-<div class="card">
-<input type="file" id="foto">
-</div>
-
-<div class="status" id="gps">GPS loading...</div>
-
-<button onclick="kirim()">🚀 KIRIM DATA</button>
-
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <script>
-// ================= FIREBASE CONFIG =================
-const firebaseConfig = {
-  apiKey: "ISI_API_KEY",
-  authDomain: "ISI_PROJECT.firebaseapp.com",
-  databaseURL: "ISI_DATABASE_URL",
-  projectId: "ISI_PROJECT",
+// ================= FIREBASE =================
+var firebaseConfig = {
+  apiKey: "AIzaSyAlsxlwijg09MpYc5ZTaPbtu8-ruPK5X4I",
+  authDomain: "geotagging-system.firebaseapp.com",
+  databaseURL: "https://geotagging-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "geotagging-system",
+  storageBucket: "geotagging-system.firebasestorage.app",
+  messagingSenderId: "954782185667",
+  appId: "1:954782185667:web:96ee2d0726a2708f39ca76"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ================= ELEMENT =================
-const sales = document.getElementById("sales");
-const cabang = document.getElementById("cabang");
-const search = document.getElementById("search");
-const list = document.getElementById("list");
-const kode = document.getElementById("kode");
-const nama = document.getElementById("nama");
-const alamat = document.getElementById("alamat");
-const progress = document.getElementById("progress");
+// ================= GLOBAL =================
+let map;
+window.latitude = "";
+window.longitude = "";
+window.fotoBase64 = "";
 
-// ================= DATA =================
-let outlets = {};
-let listData = [];
-let doneList = JSON.parse(localStorage.getItem("done")||"[]");
+// ================= LOAD SALESMAN =================
+function loadSalesman(){
+  db.ref("outlets").once("value", (snap)=>{
+    const data = snap.val();
+    let set = new Set();
 
-// ================= LOAD DATA =================
-db.ref("outlets").once("value", snap => {
+    for(let k in data){
+      set.add(data[k].salesman);
+    }
 
-  let data = snap.val();
+    let select = document.getElementById("salesman");
+    select.innerHTML = '<option value="">Pilih</option>';
 
-  for(let k in data){
-    let o = data[k];
-
-    if(!o) continue;
-
-    outlets[k] = {
-      kode: o.kode || "",
-      nama: o.nama || "",
-      cabang: o.cabang || "",
-      sales: o.salesman || ""
-    };
-  }
-
-  loadSales();
-});
-
-// ================= LOAD SALES =================
-function loadSales(){
-  let s = [...new Set(Object.values(outlets).map(o=>o.sales))];
-
-  sales.innerHTML = `<option>Pilih Sales</option>` + 
-    s.map(x=>`<option>${x}</option>`).join("");
+    set.forEach(s=>{
+      let o = document.createElement("option");
+      o.value = s;
+      o.textContent = s;
+      select.appendChild(o);
+    });
+  });
 }
 
-// ================= SALES CHANGE =================
-sales.onchange = () => {
+// ================= PILIH SALESMAN =================
+document.getElementById("salesman").addEventListener("change", function(){
 
-  let first = Object.values(outlets).find(o => o.sales === sales.value);
+  let val = this.value;
 
-  if(first){
-    cabang.value = first.cabang;
-  }
+  db.ref("outlets").once("value", (snap)=>{
+    const data = snap.val();
 
-  listData = Object.values(outlets)
-    .filter(o => o.sales === sales.value)
-    .filter(o => !doneList.includes(o.kode));
+    let outlet = document.getElementById("outlet");
+    outlet.innerHTML = '<option value="">Pilih</option>';
 
-  updateProgress();
-};
+    let cabang = "";
 
-// ================= SEARCH =================
-search.oninput = () => {
+    for(let k in data){
+      let d = data[k];
 
-  let q = search.value.toLowerCase();
+      if(d.salesman === val){
+        cabang = d.cabang;
 
-  if(!q){
-    list.style.display="none";
+        let o = document.createElement("option");
+        o.value = k;
+        o.textContent = k + " - " + d.nama;
+        outlet.appendChild(o);
+      }
+    }
+
+    document.getElementById("cabang").value = cabang;
+    updateProgress();
+  });
+
+});
+
+// ================= PILIH OUTLET =================
+document.getElementById("outlet").addEventListener("change", function(){
+  document.getElementById("kode_outlet").value = this.value;
+});
+
+// ================= GPS =================
+function ambilLokasi(){
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    let lat = pos.coords.latitude;
+    let lng = pos.coords.longitude;
+
+    window.latitude = lat;
+    window.longitude = lng;
+
+    tampilkanMap(lat,lng);
+
+    let res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+    let data = await res.json();
+
+    document.getElementById("alamat").value = data.display_name;
+  });
+}
+
+// ================= MAP =================
+function tampilkanMap(lat,lng){
+  if(map){
+    map.setView([lat,lng],16);
     return;
   }
 
-  let res = listData.filter(o =>
-    (o.nama && o.nama.toLowerCase().includes(q)) ||
-    (o.kode && o.kode.toLowerCase().includes(q))
-  );
+  map = L.map('map').setView([lat,lng],16);
 
-  list.style.display="block";
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+  }).addTo(map);
 
-  list.innerHTML = res.map(o =>
-    `<div class="item" onclick="pilih('${o.kode}')">
-      ${o.kode} - ${o.nama}
-    </div>`
-  ).join("");
-};
-
-// ================= PILIH =================
-function pilih(k){
-  let o = listData.find(x=>x.kode===k);
-
-  if(!o) return;
-
-  kode.value = o.kode;
-  nama.value = o.nama;
-
-  list.style.display="none";
+  L.marker([lat,lng]).addTo(map);
 }
 
-// ================= GPS =================
-let map = L.map('map').setView([-7.5,110.7],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+// ================= FOTO =================
+document.getElementById("foto").addEventListener("change", function(e){
+  let file = e.target.files[0];
 
-let marker;
+  if(file){
+    let reader = new FileReader();
 
-navigator.geolocation.getCurrentPosition(pos => {
+    reader.onload = function(ev){
+      document.getElementById("preview").src = ev.target.result;
+      document.getElementById("preview").style.display = "block";
+      window.fotoBase64 = ev.target.result;
+    };
 
-  let lat = pos.coords.latitude;
-  let lng = pos.coords.longitude;
-
-  marker = L.marker([lat,lng]).addTo(map);
-  map.setView([lat,lng],15);
-
-  alamat.value = lat + "," + lng;
-  document.getElementById("gps").innerText = "📍 GPS AKTIF";
-
+    reader.readAsDataURL(file);
+  }
 });
+
+// ================= KIRIM =================
+function kirimData(){
+
+  let salesman = document.getElementById("salesman").value;
+  let cabang = document.getElementById("cabang").value;
+  let outlet = document.getElementById("outlet").value;
+  let alamat = document.getElementById("alamat").value;
+
+  if(!salesman || !outlet){
+    alert("Lengkapi data!");
+    return;
+  }
+
+  db.ref("kunjungan").push({
+    salesman,
+    cabang,
+    outlet,
+    alamat,
+    lat:window.latitude,
+    lng:window.longitude,
+    foto:window.fotoBase64,
+    waktu:new Date().toISOString()
+  });
+
+  // simpan local
+  let hist = JSON.parse(localStorage.getItem("kunjungan"))||[];
+  hist.push(outlet);
+  localStorage.setItem("kunjungan",JSON.stringify(hist));
+
+  alert("Berhasil 🔥");
+
+  updateProgress();
+}
 
 // ================= PROGRESS =================
 function updateProgress(){
-  let total = listData.length + doneList.length;
-  progress.innerText = `${doneList.length}/${total} selesai`;
+  let hist = JSON.parse(localStorage.getItem("kunjungan"))||[];
+  let total = document.getElementById("outlet").options.length - 1;
+
+  document.getElementById("progress").innerText =
+    hist.length + " / " + total + " outlet selesai";
 }
 
-// ================= KIRIM =================
-function kirim(){
-
-  if(!kode.value) return alert("Pilih outlet dulu");
-
-  let data = {
-    kode: kode.value,
-    nama: nama.value,
-    cabang: cabang.value,
-    sales: sales.value,
-    alamat: alamat.value,
-    waktu: new Date().toISOString()
-  };
-
-  db.ref("validasi").push(data);
-
-  doneList.push(kode.value);
-  localStorage.setItem("done", JSON.stringify(doneList));
-
-  alert("Berhasil kirim");
-
-  location.reload();
-}
+// ================= INIT =================
+loadSalesman();
+ambilLokasi();
 
 </script>
 
